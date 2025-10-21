@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="icon" href="icon-192.png" sizes="192x192" />
+  <meta name="theme-color" content="#4f46e5" />
+  <title>FrostPantry</title>
+  <style>
+    :root { --bg:#f7f7fb; --card:#ffffff; --ink:#111827; --muted:#6b7280; --primary:#4f46e5; --border:#e5e7eb;
+            --red:#fee2e2; --red-text:#b91c1c; --orange:#ffedd5; --orange-text:#9a3412; --yellow:#fef3c7; --yellow-text:#92400e; }
+    .dark { --bg:#0b1220; --card:#0f172a; --ink:#e5e7eb; --muted:#94a3b8; --border:#1f2937; --yellow:#3b2f12; --yellow-text:#facc15; --red:#3f1d1d; --red-text:#fecaca; --orange:#3b2412; --orange-text:#ffd7a1; }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;color:var(--ink);background:var(--bg)}
+    .wrap{max-width:980px;margin:0 auto;padding:16px}
+    header{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;gap:10px}
+    h1{font-size:1.25rem;margin:0}
+    .muted{color:var(--muted); font-size:0.9rem}
+    .card{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:12px;box-shadow:0 1px 2px rgba(0,0,0,0.04);margin-bottom:12px}
+    label{font-size:.85rem;color:var(--muted);display:block;margin-bottom:4px}
+    input[type=text],input[type=date],input[type=number],select,textarea{width:100%;border:1px solid var(--border);padding:10px;border-radius:10px;background:var(--card);color:var(--ink)}
+    .row{display:grid;gap:10px}
+    @media(min-width:640px){.grid-6{grid-template-columns:2fr 2fr 1fr 1.2fr 1.5fr 1.5fr}.grid-5{grid-template-columns:2fr 1fr 1fr 1fr 1fr}.grid-4{grid-template-columns:2fr 1fr 1fr 1fr}}
+    .btn{appearance:none;border:1px solid var(--border);background:var(--card);padding:8px 12px;border-radius:10px;font-size:.95rem;color:var(--ink)}
+    .btn.primary{background:var(--primary);border-color:var(--primary);color:#fff}
+    .btn.sm{padding:4px 8px;font-size:.85rem}
+    table{width:100%;border-collapse:collapse}
+    th,td{border-bottom:1px solid var(--border);padding:10px 8px;text-align:left}
+    th{font-size:.85rem;color:var(--muted)}
+    tr.zero{background:var(--red);color:var(--red-text)}
+    tr.low{background:var(--orange);color:var(--orange-text)}
+    tr.expSoon{background:var(--yellow);color:var(--yellow-text)}
+    tr.expired{background:var(--red);color:var(--red-text)}
+    .qty-controls{display:inline-flex;align-items:center;border:1px solid var(--border);border-radius:10px;overflow:hidden}
+    .qty-controls button{border:none;background:#f3f4f6;padding:8px 12px;font-size:1.1rem}
+    .qty-controls input{width:70px;border:none;text-align:center;padding:8px;font-size:1.05rem}
+    .status{position:sticky;top:0;z-index:10;margin:-8px -8px 8px -8px;padding:8px 12px;border-radius:0 0 12px 12px;background:#eef2ff;color:#3730a3;font-size:.9rem;border:1px solid #c7d2fe;display:none}
+    .dark .status{background:#1e293b;color:#a5b4fc;border-color:#334155}
+    .mobile-hide{display:none}@media(min-width:640px){.mobile-hide{display:table-cell}}
+    .actions{display:flex;gap:6px;flex-wrap:wrap}
+    .compact th,.compact td{padding:6px 6px;font-size:.92rem}
+    .head-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+    .switch{display:inline-flex;align-items:center;gap:6px}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>FrostPantry</h1>
+      <div class="head-actions">
+        <label class="switch"><input id="toggleCompact" type="checkbox"> Compact</label>
+        <label class="switch"><input id="toggleDark" type="checkbox"> Dark</label>
+        <button class="btn" id="backup">Backup JSON</button>
+        <input type="file" id="restoreFile" accept="application/json" style="display:none" />
+        <button class="btn" id="restore">Restore JSON</button>
+      </div>
+    </header>
+    <div id="status" class="status"></div>
+    <div class="muted" style="margin-bottom:10px">Edit, Delete, Use/Add, expiry alerts, custom low-stock, backups, dark mode.</div>
+
+    <section class="card">
+      <form id="form" class="row grid-6">
+        <div><label>Category</label>
+          <select id="category"><option>Pantry</option><option>Deep Freeze</option><option>Freezer (bottom)</option><option>Fridge</option></select>
+        </div>
+        <div><label>Item</label><input id="item" type="text" required placeholder="e.g., Tomato sauce" /></div>
+        <div><label>Quantity</label>
+          <div class="qty-controls">
+            <button type="button" id="dec">−</button>
+            <input id="qty" type="text" inputmode="numeric" pattern="[0-9]*" value="1" />
+            <button type="button" id="inc">+</button>
+          </div>
+        </div>
+        <div><label>Unit</label>
+          <select id="unit"><option>packs</option><option>boxes</option><option>jars</option><option>bags</option><option>cans</option><option>lbs</option><option>each</option><option>cubes</option></select>
+        </div>
+        <div><label>Date Added</label><input id="added" type="date" /></div>
+        <div><label>Expiry</label><input id="expiry" type="date" /></div>
+        <div style="grid-column:1/-1"><label>Notes</label><textarea id="notes" rows="2" placeholder="e.g., Use first"></textarea></div>
+        <div style="grid-column:1/-1;display:flex;gap:8px;justify-content:flex-start;flex-wrap:wrap">
+          <button class="btn primary" type="submit">Add item</button>
+          <button class="btn" id="export" type="button">Export CSV</button>
+          <input type="file" id="importFile" accept=".csv" style="display:none" />
+          <button class="btn" id="import" type="button">Import CSV</button>
+          <div style="flex:1"></div>
+          <div class="switch"><label>Low-stock ≤ <input id="lowThresh" type="number" min="0" step="1" style="width:70px"></label></div>
+        </div>
+      </form>
+    </section>
+
+    <section class="card">
+      <div class="row grid-5" style="margin-bottom:8px">
+        <div><label>Search</label><input id="search" type="text" placeholder="Item, notes, unit…"/></div>
+        <div><label>Filter: Category</label>
+          <select id="filterCategory"><option>All</option><option>Pantry</option><option>Deep Freeze</option><option>Freezer (bottom)</option><option>Fridge</option></select>
+        </div>
+        <div><label>Filter: Stock</label>
+          <select id="filterStock"><option>All</option><option>Low (≤ threshold)</option><option>Zero (0)</option></select>
+        </div>
+        <div><label>Sort by</label>
+          <select id="sortBy">
+            <option value="category">Category</option>
+            <option value="item">Item</option>
+            <option value="qty">Quantity</option>
+            <option value="expiry">Expiry (oldest first)</option>
+            <option value="last">Last updated (newest first)</option>
+          </select>
+        </div>
+        <div><label>&nbsp;</label><button class="btn" id="resetFilters" type="button">Reset filters</button></div>
+      </div>
+      <div class="table-wrap">
+        <table id="table">
+          <thead><tr><th>Category</th><th>Item</th><th>Qty</th><th>Unit</th><th class="mobile-hide">Date Added</th><th class="mobile-hide">Expiry</th><th>Notes</th><th class="mobile-hide">Last used</th><th>Actions</th></tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </section>
+  </div>
+
+  <!-- Edit modal -->
+  <div id="modal" class="modal" aria-hidden="true" style="position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;align-items:center;justify-content:center;padding:16px">
+    <div class="panel" style="background:var(--card);border-radius:14px;border:1px solid var(--border);max-width:520px;width:100%;padding:14px">
+      <div class="head" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <h3 style="margin:0;font-size:1.05rem">Edit Item</h3>
+        <button id="closeModal" class="btn sm">Close</button>
+      </div>
+      <div class="row grid-6" style="margin-bottom:6px">
+        <div><label>Category</label>
+          <select id="m_category"><option>Pantry</option><option>Deep Freeze</option><option>Freezer (bottom)</option><option>Fridge</option></select>
+        </div>
+        <div><label>Item</label><input id="m_item" type="text" /></div>
+        <div><label>Quantity</label><input id="m_qty" type="text" inputmode="numeric" pattern="[0-9]*" /></div>
+        <div><label>Unit</label>
+          <select id="m_unit"><option>packs</option><option>boxes</option><option>jars</option><option>bags</option><option>cans</option><option>lbs</option><option>each</option><option>cubes</option></select>
+        </div>
+        <div><label>Date Added</label><input id="m_added" type="date" /></div>
+        <div><label>Expiry</label><input id="m_expiry" type="date" /></div>
+        <div style="grid-column:1/-1"><label>Notes</label><textarea id="m_notes" rows="2"></textarea></div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button id="deleteRow" class="btn">Delete</button>
+        <button id="saveRow" class="btn primary">Save changes</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => { navigator.serviceWorker.register('./service-worker.js').catch(()=>{}); });
+    }
+    const STORAGE_KEY = 'frostpantry_rows_v_pages';
+    const PREFS_KEY = 'frostpantry_prefs_v8a';
+    const statusEl = document.getElementById('status');
+    function flash(msg){ statusEl.textContent = msg; statusEl.style.display = 'block'; clearTimeout(flash._t); flash._t = setTimeout(()=> statusEl.style.display='none', 1500); }
+
+    const fields = { category: document.getElementById('category'), item: document.getElementById('item'), qty: document.getElementById('qty'), unit: document.getElementById('unit'), added: document.getElementById('added'), expiry: document.getElementById('expiry'), notes: document.getElementById('notes') };
+    const tbody = document.getElementById('tbody');
+    const table = document.getElementById('table');
+    const filterEls = { q: document.getElementById('search'), category: document.getElementById('filterCategory'), stock: document.getElementById('filterStock'), sort: document.getElementById('sortBy'), reset: document.getElementById('resetFilters') };
+    const lowThreshEl = document.getElementById('lowThresh');
+    const toggleCompact = document.getElementById('toggleCompact');
+    const toggleDark = document.getElementById('toggleDark');
+
+    const modal = document.getElementById('modal');
+    const closeModal = document.getElementById('closeModal');
+    const m = {
+      idx: -1,
+      category: document.getElementById('m_category'),
+      item: document.getElementById('m_item'),
+      qty: document.getElementById('m_qty'),
+      unit: document.getElementById('m_unit'),
+      added: document.getElementById('m_added'),
+      expiry: document.getElementById('m_expiry'),
+      notes: document.getElementById('m_notes'),
+      save: document.getElementById('saveRow'),
+      del: document.getElementById('deleteRow')
+    };
+
+    let rows = []; try { rows = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch(e){ rows = []; }
+    let prefs = { q:'', category:'All', stock:'All', sort:'category', low:1, dark:false, compact:false };
+    try { Object.assign(prefs, JSON.parse(localStorage.getItem(PREFS_KEY)||'{}')); } catch(e){}
+
+    // Apply prefs
+    filterEls.q.value = prefs.q || '';
+    filterEls.category.value = prefs.category || 'All';
+    filterEls.stock.value = prefs.stock || 'All';
+    filterEls.sort.value = prefs.sort || 'category';
+    lowThreshEl.value = (prefs.low ?? 1);
+    if (prefs.dark) document.body.classList.add('dark');
+    if (prefs.compact) table.classList.add('compact');
+    toggleDark.checked = !!prefs.dark;
+    toggleCompact.checked = !!prefs.compact;
+
+    function savePrefs(){ 
+      const toSave = {
+        q: filterEls.q.value,
+        category: filterEls.category.value,
+        stock: filterEls.stock.value,
+        sort: filterEls.sort.value,
+        low: Number(lowThreshEl.value||1),
+        dark: toggleDark.checked,
+        compact: toggleCompact.checked
+      };
+      localStorage.setItem(PREFS_KEY, JSON.stringify(toSave));
+    }
+
+    function sanitizeQtyInputEl(el){ const digits = (el.value||'').replace(/[^0-9]/g,''); el.value = digits === '' ? '0' : String(parseInt(digits,10)); }
+    function esc(s){ return String(s||'').replace(/[&<>'\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c] || c)); }
+    function toDate(v){ return v ? new Date(v).getTime() : NaN; }
+
+    function render(){
+      let xs = rows.map((r, idx) => ({...r, _idx: idx}));
+      const q = (filterEls.q.value||'').toLowerCase();
+      const cat = filterEls.category.value;
+      const stock = filterEls.stock.value;
+      const sortBy = filterEls.sort.value;
+      const low = Number(lowThreshEl.value||1);
+
+      if (q) xs = xs.filter(r => [r.item,r.notes,r.category,r.unit].some(v => (v||'').toLowerCase().includes(q)));
+      if (cat !== 'All') xs = xs.filter(r => r.category === cat);
+      if (stock === 'Low (≤ threshold)') xs = xs.filter(r => Number(r.qty) <= low);
+      if (stock === 'Zero (0)') xs = xs.filter(r => Number(r.qty) === 0);
+
+      xs.sort((a,b)=>{
+        switch (sortBy){
+          case 'item': return a.item.localeCompare(b.item);
+          case 'qty': return Number(a.qty)-Number(b.qty);
+          case 'expiry': {
+            const ad=isNaN(toDate(a.expiry))?Infinity:toDate(a.expiry);
+            const bd=isNaN(toDate(b.expiry))?Infinity:toDate(b.expiry);
+            return ad-bd;
+          }
+          case 'last': {
+            const ad=a.lastUpdated?Number(a.lastUpdated):0;
+            const bd=b.lastUpdated?Number(b.lastUpdated):0;
+            return bd-ad;
+          }
+          default: return a.category.localeCompare(b.category) || a.item.localeCompare(b.item);
+        }
+      });
+
+      const now = Date.now();
+      const day = 24*60*60*1000;
+
+      tbody.innerHTML = xs.length ? xs.map(r => {
+        const qty = Number(r.qty)||0;
+        const lowClass = qty===0 ? 'zero' : (qty <= low ? 'low' : '');
+        let expClass='';
+        const expMs = toDate(r.expiry);
+        if (!isNaN(expMs)) {
+          if (expMs < now - day) expClass = 'expired';
+          else if (expMs - now <= 7*day && expMs >= now - day) expClass = 'expSoon';
+        }
+        const trClass = [lowClass, expClass].filter(Boolean).join(' ');
+        const lastUsed = r.lastUsed ? new Date(r.lastUsed).toLocaleDateString() : '';
+        return `<tr class="${trClass}">
+          <td>${esc(r.category)}</td>
+          <td>${esc(r.item)}</td>
+          <td>${esc(qty)}</td>
+          <td>${esc(r.unit||'')}</td>
+          <td class="mobile-hide">${esc(r.added||'')}</td>
+          <td class="mobile-hide">${esc(r.expiry||'')}</td>
+          <td>${esc(r.notes||'')}</td>
+          <td class="mobile-hide">${esc(lastUsed)}</td>
+          <td>
+            <div class="actions">
+              <button class="btn sm" data-action="use1" data-idx="${r._idx}">Use 1</button>
+              <button class="btn sm" data-action="add1" data-idx="${r._idx}">Add 1</button>
+              <button class="btn sm" data-action="edit" data-idx="${r._idx}">Edit</button>
+              <button class="btn sm" data-action="dup" data-idx="${r._idx}">Duplicate</button>
+            </div>
+          </td>
+        </tr>`;
+      }).join('') : '<tr><td colspan="9" class="muted">No items yet. Add one above.</td></tr>';
+    }
+
+    function persist(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(rows)); }
+
+    render();
+
+    document.getElementById('form').addEventListener('submit', (e)=>{
+      e.preventDefault(); sanitizeQtyInputEl(fields.qty);
+      const now = Date.now();
+      const rec = {
+        category: fields.category.value,
+        item: fields.item.value.trim(),
+        qty: Math.max(0, Number(fields.qty.value||0)),
+        unit: fields.unit.value,
+        added: fields.added.value,
+        expiry: fields.expiry.value,
+        notes: fields.notes.value.trim(),
+        lastUpdated: now
+      };
+      if (!rec.item) { flash('Please enter an item name'); fields.item.focus(); return; }
+      rows.unshift(rec); persist(); render(); flash('Item added ✓');
+      fields.item.value=''; fields.qty.value='1'; fields.notes.value='';
+    });
+
+    tbody.addEventListener('click', (e)=>{
+      const btn = e.target.closest('button[data-action]');
+      if (!btn) return;
+      const idx = Number(btn.getAttribute('data-idx'));
+      const action = btn.getAttribute('data-action');
+      if (Number.isNaN(idx) || !rows[idx]) return;
+
+      if (action === 'use1') {
+        if (rows[idx].qty <= 0) { flash('Already at 0'); return; }
+        rows[idx].qty = Math.max(0, Number(rows[idx].qty||0) - 1);
+        rows[idx].lastUpdated = Date.now();
+        rows[idx].lastUsed = Date.now();
+        persist(); render(); flash('Used 1 ✓');
+      } else if (action === 'add1') {
+        rows[idx].qty = Math.max(0, Number(rows[idx].qty||0) + 1);
+        rows[idx].lastUpdated = Date.now();
+        persist(); render(); flash('Added 1 ✓');
+      } else if (action === 'edit') {
+        m.idx = idx;
+        m.category.value = rows[idx].category || 'Pantry';
+        m.item.value = rows[idx].item || '';
+        m.qty.value = String(rows[idx].qty ?? 0);
+        m.unit.value = rows[idx].unit || 'each';
+        m.added.value = rows[idx].added || '';
+        m.expiry.value = rows[idx].expiry || '';
+        m.notes.value = rows[idx].notes || '';
+        document.getElementById('modal').style.display = 'flex';
+      } else if (action === 'dup') {
+        const clone = JSON.parse(JSON.stringify(rows[idx]));
+        clone.lastUpdated = Date.now();
+        rows.unshift(clone);
+        persist(); render(); flash('Duplicated ✓');
+      }
+    });
+
+    closeModal.addEventListener('click', ()=>{ document.getElementById('modal').style.display='none'; });
+    document.getElementById('saveRow').addEventListener('click', ()=>{
+      const idx = m.idx; if (idx < 0 || !rows[idx]) return;
+      sanitizeQtyInputEl(m.qty);
+      rows[idx] = {
+        category: m.category.value,
+        item: m.item.value.trim(),
+        qty: Math.max(0, Number(m.qty.value||0)),
+        unit: m.unit.value,
+        added: m.added.value,
+        expiry: m.expiry.value,
+        notes: m.notes.value.trim(),
+        lastUpdated: Date.now(),
+        lastUsed: rows[idx].lastUsed || null
+      };
+      persist(); render(); document.getElementById('modal').style.display='none'; flash('Updated ✓');
+    });
+    document.getElementById('deleteRow').addEventListener('click', ()=>{
+      const idx = m.idx; if (idx < 0 || !rows[idx]) return;
+      if (!confirm('Delete this item?')) return;
+      rows.splice(idx,1); persist(); render(); document.getElementById('modal').style.display='none'; flash('Deleted ✓');
+    });
+
+    // Persist filters & prefs
+    document.getElementById('search').addEventListener('input', ()=>{ savePrefs(); render(); });
+    ['filterCategory','filterStock','sortBy'].forEach(id => document.getElementById(id).addEventListener('change', ()=>{ savePrefs(); render(); }));
+    document.getElementById('resetFilters').addEventListener('click', ()=>{
+      filterEls.q.value=''; filterEls.category.value='All'; filterEls.stock.value='All'; filterEls.sort.value='category'; savePrefs(); render();
+    });
+    lowThreshEl.addEventListener('input', ()=>{ savePrefs(); render(); });
+    toggleCompact.addEventListener('change', ()=>{ table.classList.toggle('compact', toggleCompact.checked); savePrefs(); });
+    toggleDark.addEventListener('change', ()=>{ document.body.classList.toggle('dark', toggleDark.checked); savePrefs(); });
+
+    // CSV Export/Import
+    document.getElementById('export').addEventListener('click', ()=>{
+      const header=['Category','Item','Quantity','Unit','Date Added','Expiry','Notes','LastUpdated','LastUsed'];
+      const body=rows.map(r=>[r.category,r.item,r.qty,r.unit,r.added||'',r.expiry||'',(r.notes||'').replace(/\n/g,' '),r.lastUpdated||'',r.lastUsed||'']);
+      const csv=[header].concat(body).map(cols=>cols.map((v)=>{ const s=String(v||''); return (s.includes(',')||s.includes('"')||s.includes('\n')) ? '"'+s.replace(/"/g,'""')+'"' : s; }).join(',')).join('\n');
+      const blob=new Blob([csv], {type:'text/csv'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='inventory.csv'; document.body.appendChild(a); a.click(); a.remove();
+    });
+    document.getElementById('import').addEventListener('click', ()=> document.getElementById('importFile').click());
+    document.getElementById('importFile').addEventListener('change', (e)=>{
+      const file=e.target.files&&e.target.files[0]; if(!file) return;
+      const reader=new FileReader();
+      reader.onload=()=>{
+        try{
+          const text=String(reader.result);
+          const lines=text.split(/\r?\n/).filter(Boolean);
+          if(lines.length<=1) return;
+          for(let i=1;i<lines.length;i++){
+            const cols=parseCsvLine(lines[i]); if(!cols) continue;
+            const [cat,item,qty,unit,added,expiry,notes,lastUpdated,lastUsed]=cols;
+            if(!item) continue;
+            rows.unshift({category:cat||'Pantry', item, qty:Math.max(0,Number(qty||0)), unit:unit||'each', added:added||'', expiry:expiry||'', notes:notes||'', lastUpdated:lastUpdated||Date.now(), lastUsed:lastUsed||null});
+          }
+          persist(); render(); flash('Imported ✓');
+        }catch(err){ alert('Import failed: '+err.message); }
+        e.target.value='';
+      };
+      reader.readAsText(file);
+    });
+    function parseCsvLine(line){ const out=[]; let i=0,cur='',inQ=false; while(i<line.length){ const ch=line[i]; if(inQ){ if(ch==='"'){ if(line[i+1]==='"'){ cur+='"'; i+=2; continue;} inQ=false; i++; continue;} cur+=ch; i++; continue;} else { if(ch===','){ out.push(cur); cur=''; i++; continue;} if(ch==='"'){ inQ=true; i++; continue;} cur+=ch; i++; continue;} } out.push(cur); return out; }
+
+    // Backups (JSON)
+    document.getElementById('backup').addEventListener('click', ()=>{
+      const prefs = JSON.parse(localStorage.getItem(PREFS_KEY)||'{}');
+      const payload = { rows, prefs };
+      const blob=new Blob([JSON.stringify(payload)], {type:'application/json'});
+      const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='frostpantry-backup.json'; document.body.appendChild(a); a.click(); a.remove();
+    });
+    document.getElementById('restore').addEventListener('click', ()=> document.getElementById('restoreFile').click());
+    document.getElementById('restoreFile').addEventListener('change', (e)=>{
+      const file=e.target.files&&e.target.files[0]; if(!file) return;
+      const reader=new FileReader();
+      reader.onload=()=>{
+        try{
+          const payload = JSON.parse(String(reader.result)||'{}');
+          let prefs = JSON.parse(localStorage.getItem(PREFS_KEY)||'{}');
+          if (Array.isArray(payload)) { rows = payload; } else { rows = payload.rows || rows; prefs = Object.assign(prefs, payload.prefs||{}); }
+          localStorage.setItem(PREFS_KEY, JSON.stringify(prefs));
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(rows));
+          filterEls.q.value = prefs.q || ''; filterEls.category.value = prefs.category || 'All'; filterEls.stock.value = prefs.stock || 'All'; filterEls.sort.value = prefs.sort || 'category';
+          lowThreshEl.value = (prefs.low ?? 1);
+          document.body.classList.toggle('dark', !!prefs.dark); table.classList.toggle('compact', !!prefs.compact);
+          toggleDark.checked = !!prefs.dark; toggleCompact.checked = !!prefs.compact;
+          render(); flash('Restored ✓');
+        }catch(err){ alert('Restore failed: '+err.message); }
+        e.target.value='';
+      };
+      reader.readAsText(file);
+    });
+  </script>
+</body>
+</html>

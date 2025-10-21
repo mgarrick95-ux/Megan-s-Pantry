@@ -1,0 +1,20 @@
+FrostPantry v8a – Quick Setup
+
+1) Upload
+   • Go to your GitHub repo (the one serving Pages).
+   • Click “Add file” → “Upload files”.
+   • Upload ALL files from this ZIP directly to your repo (root). If your Pages is set to main/docs, put them in the docs folder instead.
+   • If asked, choose “Replace existing files”, then click “Commit changes”.
+
+2) Refresh the app
+   • Visit your site and add ?v=8a to the end of the URL once (forces cache refresh).
+   • If it still looks old, in your browser go to: Settings → Site settings → Storage → Clear data for your site.
+
+3) Use the app
+   • Tap Use 1 / Add 1 to update quantities.
+   • Edit/Delete allows full row editing and removing.
+   • Set your low-stock threshold and it will persist.
+   • Expiry colors: yellow (soon), red (expired).
+   • Backup JSON lets you save everything; Restore will bring it back.
+
+Tip: If GitHub Pages is set to “main / docs”, put these files inside the docs/ folder instead of the repo root.
