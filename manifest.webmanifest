@@ -1,7 +1,7 @@
 {
   "name": "FrostPantry",
   "short_name": "FrostPantry",
-  "description": "Offline pantry & freezer tracker with search, filters, and quick Use/Add actions.",
+  "description": "Offline pantry & freezer tracker with search, filters, Use/Add, and full row editing.",
   "start_url": "./",
   "scope": ".",
   "display": "standalone",

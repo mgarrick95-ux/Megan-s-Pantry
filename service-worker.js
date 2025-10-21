@@ -1,5 +1,4 @@
-
-const CACHE_NAME = 'frostpantry-pages-v5'; // force refresh
+const CACHE_NAME = 'frostpantry-pages-v7';
 const ASSETS = [
   './',
   './index.html',

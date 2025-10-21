@@ -30,13 +30,18 @@
     .status{position:sticky;top:0;z-index:10;margin:-8px -8px 8px -8px;padding:8px 12px;border-radius:0 0 12px 12px;background:#eef2ff;color:#3730a3;font-size:.9rem;border:1px solid #c7d2fe;display:none}
     .mobile-hide{display:none}@media(min-width:640px){.mobile-hide{display:table-cell}}
     .actions{display:flex;gap:6px;flex-wrap:wrap}
+    /* Modal */
+    .modal{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;align-items:center;justify-content:center;padding:16px}
+    .modal .panel{background:#fff;border-radius:14px;border:1px solid var(--border);max-width:520px;width:100%;padding:14px}
+    .modal .head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+    .modal h3{margin:0;font-size:1.05rem}
   </style>
 </head>
 <body>
   <div class="wrap">
     <header><h1>FrostPantry</h1></header>
     <div id="status" class="status"></div>
-    <div class="muted" style="margin-bottom:10px">Tap <b>Use 1</b> or <b>Add 1</b> on any row to update quantity.</div>
+    <div class="muted" style="margin-bottom:10px">Now with <b>Edit</b>, <b>Delete</b>, and quick <b>Use 1 / Add 1</b> actions.</div>
 
     <section class="card">
       <form id="form" class="row grid-6">
@@ -89,6 +94,33 @@
     </section>
   </div>
 
+  <!-- Edit modal -->
+  <div id="modal" class="modal" aria-hidden="true">
+    <div class="panel">
+      <div class="head">
+        <h3>Edit Item</h3>
+        <button id="closeModal" class="btn sm">Close</button>
+      </div>
+      <div class="row grid-6" style="margin-bottom:6px">
+        <div><label>Category</label>
+          <select id="m_category"><option>Pantry</option><option>Deep Freeze</option><option>Freezer (bottom)</option><option>Fridge</option></select>
+        </div>
+        <div><label>Item</label><input id="m_item" type="text" /></div>
+        <div><label>Quantity</label><input id="m_qty" type="text" inputmode="numeric" pattern="[0-9]*" /></div>
+        <div><label>Unit</label>
+          <select id="m_unit"><option>packs</option><option>boxes</option><option>jars</option><option>bags</option><option>cans</option><option>lbs</option><option>each</option><option>cubes</option></select>
+        </div>
+        <div><label>Date Added</label><input id="m_added" type="date" /></div>
+        <div><label>Expiry</label><input id="m_expiry" type="date" /></div>
+        <div style="grid-column:1/-1"><label>Notes</label><textarea id="m_notes" rows="2"></textarea></div>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button id="deleteRow" class="btn">Delete</button>
+        <button id="saveRow" class="btn primary">Save changes</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => { navigator.serviceWorker.register('./service-worker.js').catch(()=>{}); });
@@ -96,17 +128,30 @@
     const STORAGE_KEY = 'frostpantry_rows_v_pages';
     const statusEl = document.getElementById('status');
     function flash(msg){ statusEl.textContent = msg; statusEl.style.display = 'block'; clearTimeout(flash._t); flash._t = setTimeout(()=> statusEl.style.display='none', 1500); }
+
     const fields = { category: document.getElementById('category'), item: document.getElementById('item'), qty: document.getElementById('qty'), unit: document.getElementById('unit'), added: document.getElementById('added'), expiry: document.getElementById('expiry'), notes: document.getElementById('notes') };
-    const btnDec = document.getElementById('dec'); const btnInc = document.getElementById('inc'); const tbody = document.getElementById('tbody');
+    const tbody = document.getElementById('tbody');
     const filterEls = { q: document.getElementById('search'), category: document.getElementById('filterCategory'), stock: document.getElementById('filterStock'), sort: document.getElementById('sortBy'), reset: document.getElementById('resetFilters') };
+
+    // Modal elements
+    const modal = document.getElementById('modal');
+    const closeModal = document.getElementById('closeModal');
+    const m = {
+      idx: -1,
+      category: document.getElementById('m_category'),
+      item: document.getElementById('m_item'),
+      qty: document.getElementById('m_qty'),
+      unit: document.getElementById('m_unit'),
+      added: document.getElementById('m_added'),
+      expiry: document.getElementById('m_expiry'),
+      notes: document.getElementById('m_notes'),
+      save: document.getElementById('saveRow'),
+      del: document.getElementById('deleteRow')
+    };
+
     let rows = []; try { rows = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch(e){ rows = []; }
 
-    function sanitizeQtyInput(el){ const digits = (el.value||'').replace(/[^0-9]/g,''); el.value = digits === '' ? '0' : String(parseInt(digits,10)); }
-    fields.qty.addEventListener('input', ()=> sanitizeQtyInput(fields.qty)); fields.qty.addEventListener('change', ()=> sanitizeQtyInput(fields.qty));
-    function holdRepeat(el, fn){ let t, r; const start=()=>{ fn(); t=setTimeout(()=>{ r=setInterval(fn,80); },350); }; const stop=()=>{ clearTimeout(t); clearInterval(r); };
-      el.addEventListener('mousedown', start); el.addEventListener('touchstart', start, {passive:true}); ['mouseup','mouseleave','touchend','touchcancel'].forEach(ev=> el.addEventListener(ev, stop)); }
-    holdRepeat(btnDec, ()=> { fields.qty.value = String(Math.max(0, Number(fields.qty.value||0) - 1)); });
-    holdRepeat(btnInc, ()=> { fields.qty.value = String(Math.max(0, Number(fields.qty.value||0) + 1)); });
+    function sanitizeQtyInputEl(el){ const digits = (el.value||'').replace(/[^0-9]/g,''); el.value = digits === '' ? '0' : String(parseInt(digits,10)); }
 
     function esc(s){ return String(s||'').replace(/[&<>'\"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#39;'}[c] || c)); }
 
@@ -143,6 +188,7 @@
             <div class="actions">
               <button class="btn sm" data-action="use1" data-idx="${r._idx}">Use 1</button>
               <button class="btn sm" data-action="add1" data-idx="${r._idx}">Add 1</button>
+              <button class="btn sm" data-action="edit" data-idx="${r._idx}">Edit</button>
             </div>
           </td>
         </tr>`;
@@ -151,22 +197,34 @@
 
     function persist(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(rows)); }
 
+    // Initial render
     render();
 
+    // Add item
     document.getElementById('form').addEventListener('submit', (e)=>{
-      e.preventDefault(); sanitizeQtyInput(fields.qty);
-      const rec = { category: fields.category.value, item: fields.item.value.trim(), qty: Math.max(0, Number(fields.qty.value||0)), unit: fields.unit.value, added: fields.added.value, expiry: fields.expiry.value, notes: fields.notes.value.trim() };
+      e.preventDefault(); sanitizeQtyInputEl(fields.qty);
+      const rec = {
+        category: fields.category.value,
+        item: fields.item.value.trim(),
+        qty: Math.max(0, Number(fields.qty.value||0)),
+        unit: fields.unit.value,
+        added: fields.added.value,
+        expiry: fields.expiry.value,
+        notes: fields.notes.value.trim()
+      };
       if (!rec.item) { flash('Please enter an item name'); fields.item.focus(); return; }
       rows.unshift(rec); persist(); render(); flash('Item added ✓');
       fields.item.value=''; fields.qty.value='1'; fields.notes.value='';
     });
 
-    document.getElementById('tbody').addEventListener('click', (e)=>{
+    // Row actions
+    tbody.addEventListener('click', (e)=>{
       const btn = e.target.closest('button[data-action]');
       if (!btn) return;
       const idx = Number(btn.getAttribute('data-idx'));
       const action = btn.getAttribute('data-action');
       if (Number.isNaN(idx) || !rows[idx]) return;
+
       if (action === 'use1') {
         if (rows[idx].qty <= 0) { flash('Already at 0'); return; }
         rows[idx].qty = Math.max(0, Number(rows[idx].qty||0) - 1);
@@ -174,9 +232,45 @@
       } else if (action === 'add1') {
         rows[idx].qty = Math.max(0, Number(rows[idx].qty||0) + 1);
         persist(); render(); flash('Added 1 ✓');
+      } else if (action === 'edit') {
+        // Open modal prefilled
+        m.idx = idx;
+        m.category.value = rows[idx].category || 'Pantry';
+        m.item.value = rows[idx].item || '';
+        m.qty.value = String(rows[idx].qty ?? 0);
+        m.unit.value = rows[idx].unit || 'each';
+        m.added.value = rows[idx].added || '';
+        m.expiry.value = rows[idx].expiry || '';
+        m.notes.value = rows[idx].notes || '';
+        modal.style.display = 'flex';
       }
     });
 
+    // Modal actions
+    closeModal.addEventListener('click', ()=>{ modal.style.display='none'; });
+    m.save.addEventListener('click', ()=>{
+      // Save edited row
+      const idx = m.idx; if (idx < 0 || !rows[idx]) return;
+      // sanitize qty
+      sanitizeQtyInputEl(m.qty);
+      rows[idx] = {
+        category: m.category.value,
+        item: m.item.value.trim(),
+        qty: Math.max(0, Number(m.qty.value||0)),
+        unit: m.unit.value,
+        added: m.added.value,
+        expiry: m.expiry.value,
+        notes: m.notes.value.trim()
+      };
+      persist(); render(); modal.style.display='none'; flash('Updated ✓');
+    });
+    m.del.addEventListener('click', ()=>{
+      const idx = m.idx; if (idx < 0 || !rows[idx]) return;
+      if (!confirm('Delete this item?')) return;
+      rows.splice(idx,1); persist(); render(); modal.style.display='none'; flash('Deleted ✓');
+    });
+
+    // Filters & sorting
     document.getElementById('search').addEventListener('input', render);
     ['filterCategory','filterStock','sortBy'].forEach(id => document.getElementById(id).addEventListener('change', render));
     document.getElementById('resetFilters').addEventListener('click', ()=>{
@@ -187,6 +281,7 @@
       render();
     });
 
+    // Qty input helpers on add form
     document.getElementById('dec').addEventListener('click', ()=>{
       fields.qty.value = String(Math.max(0, Number(fields.qty.value||0) - 1));
     });
