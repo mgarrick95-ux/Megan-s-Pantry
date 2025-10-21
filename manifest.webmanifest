@@ -1,7 +1,7 @@
 {
   "name": "FrostPantry",
   "short_name": "FrostPantry",
-  "description": "Offline pantry & freezer tracker with search, filters, and red/orange stock alerts.",
+  "description": "Offline pantry & freezer tracker with search, filters, and quick Use/Add actions.",
   "start_url": "./",
   "scope": ".",
   "display": "standalone",
